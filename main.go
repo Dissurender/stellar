@@ -1,12 +1,9 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
+	"github.com/Dissurender/stellar"
 	"math/rand"
-	"os"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 )
@@ -24,64 +21,6 @@ const (
 	White   = "\033[37m"
 )
 
-type Microservice struct {
-	id        int
-	outbox    chan Message
-	inbox     chan Message
-	neighbors []*Microservice
-}
-
-type Message struct {
-	requestId   int
-	requestType string
-	from        int
-	to          int
-	data        string
-	sendAt      time.Time
-	latency     time.Duration
-}
-
-type Connection struct {
-	from       *Microservice
-	to         *Microservice
-	latency    time.Duration
-	packetLoss float64
-}
-
-func (ms *Microservice) connect(other *Microservice, latency time.Duration, packetLoss float64) error {
-	if other == nil {
-		return fmt.Errorf("%scannot connect to a nil Microservice%s", Red, Reset)
-	}
-	if latency < 0 {
-		return fmt.Errorf(fmt.Sprintf("%slatency must be non-negative%s", Red, Reset))
-	}
-	if packetLoss < 0 || packetLoss > 1 {
-		return fmt.Errorf(fmt.Sprintf("%spacket loss is out of bounds%s", Red, Reset))
-	}
-
-	ms.neighbors = append(ms.neighbors, other)
-	network.connections = append(network.connections, &Connection{
-		from:       ms,
-		to:         other,
-		latency:    latency,
-		packetLoss: packetLoss,
-	})
-
-	return nil
-}
-
-func (ms *Microservice) send(msg Message) {
-	ms.outbox <- msg
-}
-
-func (ms *Microservice) run(wg *sync.WaitGroup) {
-	defer wg.Done()
-
-	for msg := range ms.inbox {
-		ms.handleRequest(msg)
-	}
-}
-
 var requestTypes = []string{"GetData", "UpdateData", "DeleteData"}
 
 func (ms *Microservice) handleRequest(msg Message) {
@@ -95,14 +34,6 @@ func (ms *Microservice) handleRequest(msg Message) {
 	default:
 		fmt.Printf("%sMicroservice %d: Unknown request type from Microservice %d%s\n", Red, ms.id, msg.from, Reset)
 	}
-}
-
-func randomDur(min, max int) time.Duration {
-	return time.Duration(rand.Intn(max-min)+min) * time.Millisecond
-}
-
-type Network struct {
-	connections []*Connection
 }
 
 var network Network
@@ -194,72 +125,4 @@ func main() {
 		}(i)
 	}
 
-	reader := bufio.NewReader(os.Stdin)
-
-	for {
-		fmt.Printf("%sEnter a request with the format: <from> <to> <requestType> (e.g., 0 1 GetData)%s\n", Green, Reset)
-		fmt.Printf("%sOr type 'exit' to quit: %s\n", Green, Reset)
-
-		input, err := reader.ReadString('\n')
-		if err != nil {
-			fmt.Printf("%sError reading input: %s%s\n", Red, err, Reset)
-			continue
-		}
-
-		input = strings.TrimSpace(input)
-
-		if input == "exit" {
-
-			for i := 0; i < microserviceCount; i++ {
-				close(microservices[i].outbox)
-				close(microservices[i].inbox)
-			}
-
-			os.Exit(0)
-		}
-
-		parts := strings.Split(input, " ")
-		if len(parts) != 3 {
-			fmt.Printf("%sInvalid input format, please try again.%s\n", Red, Reset)
-			continue
-		}
-
-		from, err := strconv.Atoi(parts[0])
-		if err != nil || from < 0 || from >= microserviceCount {
-			fmt.Printf("%sInvalid 'from' microservice ID, please try again.%s\n", Red, Reset)
-			continue
-		}
-
-		to, err := strconv.Atoi(parts[1])
-		if err != nil || to < 0 || to >= microserviceCount {
-			fmt.Printf("%sInvalid 'to' microservices ID, please try again.%s\n", Red, Reset)
-			continue
-		}
-
-		requestType := parts[2]
-		if !contains(requestTypes, requestType) {
-			fmt.Printf("%sInvalid request type. Allowed types: %v%s\n", Red, requestTypes, Reset)
-			continue
-		}
-
-		requestID := rand.Int()
-		microservices[from].send(Message{
-			requestId:   requestID,
-			requestType: requestType,
-			from:        from,
-			to:          to,
-			data:        fmt.Sprintf("%sRequest from microservices %d!%s", Magenta, from, Reset),
-			sendAt:      time.Now(),
-			latency:     randomDur(10, 100),
-		})
-	}
-}
-
-func contains(arr []string, str string) bool {
-	for _, v := range arr {
-		if v == str {
-			return true
-		}
-	}
-	return false
 }
