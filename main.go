@@ -41,6 +41,10 @@ type Message struct {
 	latency     time.Duration
 }
 
+type Network struct {
+	connections []*Connection
+}
+
 type Connection struct {
 	from       *Microservice
 	to         *Microservice
@@ -101,11 +105,10 @@ func randomDur(min, max int) time.Duration {
 	return time.Duration(rand.Intn(max-min)+min) * time.Millisecond
 }
 
-type Network struct {
-	connections []*Connection
-}
-
 var network Network
+
+var microserviceCount = 10
+var microservices = make([]*Microservice, microserviceCount)
 
 //
 //
@@ -114,9 +117,6 @@ var network Network
 func main() {
 	// rand.Seed(seed)
 	rand.NewSource(time.Now().UnixNano())
-
-	microserviceCount := 10
-	microservices := make([]*Microservice, microserviceCount)
 
 	for i := 0; i < microserviceCount; i++ {
 		microservices[i] = &Microservice{
@@ -194,6 +194,18 @@ func main() {
 		}(i)
 	}
 
+	sendWg.Wait()
+
+	runCLI()
+
+	for i := 0; i < microserviceCount; i++ {
+		close(microservices[i].outbox)
+		close(microservices[i].inbox)
+	}
+
+}
+
+func runCLI() {
 	reader := bufio.NewReader(os.Stdin)
 
 	for {
@@ -209,13 +221,7 @@ func main() {
 		input = strings.TrimSpace(input)
 
 		if input == "exit" {
-
-			for i := 0; i < microserviceCount; i++ {
-				close(microservices[i].outbox)
-				close(microservices[i].inbox)
-			}
-
-			os.Exit(0)
+			break
 		}
 
 		parts := strings.Split(input, " ")
