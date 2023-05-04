@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"github.com/Dissurender/stellar"
 	"math/rand"
+	"os"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -83,7 +86,6 @@ func (ms *Microservice) run(wg *sync.WaitGroup) {
 	}
 }
 
-
 var requestTypes = []string{"GetData", "UpdateData", "DeleteData"}
 
 func (ms *Microservice) handleRequest(msg Message) {
@@ -98,7 +100,6 @@ func (ms *Microservice) handleRequest(msg Message) {
 		fmt.Printf("%sMicroservice %d: Unknown request type from Microservice %d%s\n", Red, ms.id, msg.from, Reset)
 	}
 }
-
 
 func randomDur(min, max int) time.Duration {
 	return time.Duration(rand.Intn(max-min)+min) * time.Millisecond
