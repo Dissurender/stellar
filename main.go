@@ -110,10 +110,6 @@ var network Network
 var microserviceCount = 10
 var microservices = make([]*Microservice, microserviceCount)
 
-//
-//
-//
-
 func main() {
 	// rand.Seed(seed)
 	rand.NewSource(time.Now().UnixNano())
