@@ -52,6 +52,7 @@ type Connection struct {
 	packetLoss float64
 }
 
+// connect() adds a node to the network via .neighbors
 func (ms *Microservice) connect(other *Microservice, latency time.Duration, packetLoss float64) error {
 	if other == nil {
 		return fmt.Errorf("%scannot connect to a nil Microservice%s", Red, Reset)
@@ -74,10 +75,12 @@ func (ms *Microservice) connect(other *Microservice, latency time.Duration, pack
 	return nil
 }
 
+// send() is a simple method for throwing messages to other microservices
 func (ms *Microservice) send(msg Message) {
 	ms.outbox <- msg
 }
 
+// run() processes queued up messages a microservice has
 func (ms *Microservice) run(wg *sync.WaitGroup) {
 	defer wg.Done()
 
@@ -101,10 +104,12 @@ func (ms *Microservice) handleRequest(msg Message) {
 	}
 }
 
+// helper func to determine latency for messages
 func randomDur(min, max int) time.Duration {
 	return time.Duration(rand.Intn(max-min)+min) * time.Millisecond
 }
 
+// initialize psuedo global values for use throughout the program
 var network Network
 
 var microserviceCount = 10
@@ -123,6 +128,7 @@ func main() {
 		}
 	}
 
+	// add a bit of attributes that would apply in real situation
 	for i := 0; i < microserviceCount; i++ {
 		for j := i + 1; j < microserviceCount; j++ {
 			latency := randomDur(10, 100)
@@ -150,7 +156,7 @@ func main() {
 		go func(sender int) {
 			defer sendWg.Done()
 			for requestId, neighbor := range microservices[sender].neighbors {
-				// Choose a random request type
+
 				requestType := requestTypes[rand.Intn(len(requestTypes))]
 
 				microservices[sender].send(Message{
@@ -194,6 +200,7 @@ func main() {
 
 	runCLI()
 
+	// tie off the open channels
 	for i := 0; i < microserviceCount; i++ {
 		close(microservices[i].outbox)
 		close(microservices[i].inbox)
@@ -256,6 +263,8 @@ func runCLI() {
 		})
 	}
 }
+
+// contains() is a helper function for runCLI()
 
 func contains(arr []string, str string) bool {
 	for _, v := range arr {
