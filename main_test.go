@@ -12,17 +12,17 @@ import (
 
 func Test_connect(t *testing.T) {
 
-	t.Run("nil Microservice", func(t *testing.T) {
-		ms := &Microservice{}
+	t.Run("nil Client", func(t *testing.T) {
+		ms := &Client{}
 		err := ms.connect(nil, 0, 0)
 		if err == nil {
-			t.Fatal("Expected error when connecting to a nil Microservice")
+			t.Fatal("Expected error when connecting to a nil Client")
 		}
 	})
 
 	t.Run("negative latency", func(t *testing.T) {
-		ms1 := &Microservice{}
-		ms2 := &Microservice{}
+		ms1 := &Client{}
+		ms2 := &Client{}
 		err := ms1.connect(ms2, -1*time.Millisecond, 0)
 		if err == nil {
 			t.Fatal("Expected error when connecting with negative latency")
@@ -30,8 +30,8 @@ func Test_connect(t *testing.T) {
 	})
 
 	t.Run("negative packet loss", func(t *testing.T) {
-		ms1 := &Microservice{}
-		ms2 := &Microservice{}
+		ms1 := &Client{}
+		ms2 := &Client{}
 		err := ms1.connect(ms2, 0, -0.1)
 		if err == nil {
 			t.Fatal("Expected error when connecting with negative packet loss")
@@ -39,8 +39,8 @@ func Test_connect(t *testing.T) {
 	})
 
 	t.Run("packet loss greater than 1", func(t *testing.T) {
-		ms1 := &Microservice{}
-		ms2 := &Microservice{}
+		ms1 := &Client{}
+		ms2 := &Client{}
 		err := ms1.connect(ms2, 0, 1.1)
 		if err == nil {
 			t.Fatal("Expected error when connecting with packet loss greater than 1")
@@ -48,15 +48,15 @@ func Test_connect(t *testing.T) {
 	})
 
 	t.Run("successful connection", func(t *testing.T) {
-		ms1 := &Microservice{}
-		ms2 := &Microservice{}
+		ms1 := &Client{}
+		ms2 := &Client{}
 		err := ms1.connect(ms2, 100*time.Millisecond, 0.1)
 		if err != nil {
 			t.Fatalf("Unexpected error when connecting: %v", err)
 		}
 
 		if len(ms1.neighbors) != 1 || ms1.neighbors[0] != ms2 {
-			t.Fatal("Microserviece connection not established correctly")
+			t.Fatal("Client connection not established correctly")
 		}
 
 		if len(network.connections) != 1 {
@@ -95,7 +95,7 @@ func captureOutput(f func()) string {
 }
 
 func Test_handleRequest(t *testing.T) {
-	ms := &Microservice{id: 1}
+	ms := &Client{id: 1}
 
 	t.Run("handle GetData request", func(t *testing.T) {
 		msg := Message{from: 2, requestType: "GetData"}
@@ -103,7 +103,7 @@ func Test_handleRequest(t *testing.T) {
 			ms.handleRequest(msg)
 		})
 
-		expected := fmt.Sprintf("%sMicroservice 1: Received GetData request from Microservice 2%s\n", Blue, Reset)
+		expected := fmt.Sprintf("%sClient 1: Received GetData request from Client 2%s\n", Blue, Reset)
 		if output != expected {
 			t.Fatalf("Expected output: %q, got: %q", expected, output)
 		}
@@ -115,7 +115,7 @@ func Test_handleRequest(t *testing.T) {
 			ms.handleRequest(msg)
 		})
 
-		expected := fmt.Sprintf("%sMicroservice 1: Received UpdateData request from Microservice 2%s\n", Yellow, Reset)
+		expected := fmt.Sprintf("%sClient 1: Received UpdateData request from Client 2%s\n", Yellow, Reset)
 		if output != expected {
 			t.Fatalf("Expected output: %q, got: %q", expected, output)
 		}
@@ -127,7 +127,7 @@ func Test_handleRequest(t *testing.T) {
 			ms.handleRequest(msg)
 		})
 
-		expected := fmt.Sprintf("%sMicroservice 1: Received DeleteData request from Microservice 2%s\n", Magenta, Reset)
+		expected := fmt.Sprintf("%sClient 1: Received DeleteData request from Client 2%s\n", Magenta, Reset)
 		if output != expected {
 			t.Fatalf("Expected output: %q, got: %q", expected, output)
 		}
@@ -139,7 +139,7 @@ func Test_handleRequest(t *testing.T) {
 			ms.handleRequest(msg)
 		})
 
-		expected := fmt.Sprintf("%sMicroservice 1: Unknown request type from Microservice 2%s\n", Red, Reset)
+		expected := fmt.Sprintf("%sClient 1: Unknown request type from Client 2%s\n", Red, Reset)
 		if output != expected {
 			t.Fatalf("Expected output: %q, got: %q", expected, output)
 		}

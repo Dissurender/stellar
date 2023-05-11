@@ -24,11 +24,12 @@ const (
 	White   = "\033[37m"
 )
 
-type Microservice struct {
+type Client struct {
 	id        int
+	cType     string
 	outbox    chan Message
 	inbox     chan Message
-	neighbors []*Microservice
+	neighbors []*Client
 }
 
 type Message struct {
@@ -46,16 +47,16 @@ type Network struct {
 }
 
 type Connection struct {
-	from       *Microservice
-	to         *Microservice
+	from       *Client
+	to         *Client
 	latency    time.Duration
 	packetLoss float64
 }
 
 // connect() adds a node to the network via .neighbors
-func (ms *Microservice) connect(other *Microservice, latency time.Duration, packetLoss float64) error {
+func (c *Client) connect(other *Client, latency time.Duration, packetLoss float64) error {
 	if other == nil {
-		return fmt.Errorf("%scannot connect to a nil Microservice%s", Red, Reset)
+		return fmt.Errorf("%scannot connect to a nil Client%s", Red, Reset)
 	}
 	if latency < 0 {
 		return fmt.Errorf(fmt.Sprintf("%slatency must be non-negative%s", Red, Reset))
@@ -64,9 +65,9 @@ func (ms *Microservice) connect(other *Microservice, latency time.Duration, pack
 		return fmt.Errorf(fmt.Sprintf("%spacket loss is out of bounds%s", Red, Reset))
 	}
 
-	ms.neighbors = append(ms.neighbors, other)
+	c.neighbors = append(c.neighbors, other)
 	network.connections = append(network.connections, &Connection{
-		from:       ms,
+		from:       c,
 		to:         other,
 		latency:    latency,
 		packetLoss: packetLoss,
@@ -75,32 +76,32 @@ func (ms *Microservice) connect(other *Microservice, latency time.Duration, pack
 	return nil
 }
 
-// send() is a simple method for throwing messages to other microservices
-func (ms *Microservice) send(msg Message) {
-	ms.outbox <- msg
+// send() is a simple method for throwing messages to other clients
+func (c *Client) send(msg Message) {
+	c.outbox <- msg
 }
 
-// run() processes queued up messages a microservice has
-func (ms *Microservice) run(wg *sync.WaitGroup) {
+// run() processes queued up messages a clients has
+func (c *Client) run(wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	for msg := range ms.inbox {
-		ms.handleRequest(msg)
+	for msg := range c.inbox {
+		c.handleRequest(msg)
 	}
 }
 
 var requestTypes = []string{"GetData", "UpdateData", "DeleteData"}
 
-func (ms *Microservice) handleRequest(msg Message) {
+func (c *Client) handleRequest(msg Message) {
 	switch msg.requestType {
 	case "GetData":
-		fmt.Printf("%sMicroservice %d: Received GetData request from Microservice %d%s\n", Blue, ms.id, msg.from, Reset)
+		fmt.Printf("%sClient %d: Received GetData request from Client %d%s\n", Blue, c.id, msg.from, Reset)
 	case "UpdateData":
-		fmt.Printf("%sMicroservice %d: Received UpdateData request from Microservice %d%s\n", Yellow, ms.id, msg.from, Reset)
+		fmt.Printf("%sClient %d: Received UpdateData request from Client %d%s\n", Yellow, c.id, msg.from, Reset)
 	case "DeleteData":
-		fmt.Printf("%sMicroservice %d: Received DeleteData request from Microservice %d%s\n", Magenta, ms.id, msg.from, Reset)
+		fmt.Printf("%sClient %d: Received DeleteData request from Client %d%s\n", Magenta, c.id, msg.from, Reset)
 	default:
-		fmt.Printf("%sMicroservice %d: Unknown request type from Microservice %d%s\n", Red, ms.id, msg.from, Reset)
+		fmt.Printf("%sClient %d: Unknown request type from Client %d%s\n", Red, c.id, msg.from, Reset)
 	}
 }
 
@@ -112,30 +113,31 @@ func randomDur(min, max int) time.Duration {
 // initialize psuedo global values for use throughout the program
 var network Network
 
-var microserviceCount = 10
-var microservices = make([]*Microservice, microserviceCount)
+var ClientCount = 10
+var Clients = make([]*Client, ClientCount)
 
 func main() {
 	// rand.Seed(seed)
 	rand.NewSource(time.Now().UnixNano())
 
-	for i := 0; i < microserviceCount; i++ {
-		microservices[i] = &Microservice{
+	for i := 0; i < ClientCount; i++ {
+		Clients[i] = &Client{
 			id:        i,
+			cType:     "client",
 			outbox:    make(chan Message),
 			inbox:     make(chan Message),
-			neighbors: []*Microservice{},
+			neighbors: []*Client{},
 		}
 	}
 
 	// add a bit of attributes that would apply in real situation
-	for i := 0; i < microserviceCount; i++ {
-		for j := i + 1; j < microserviceCount; j++ {
+	for i := 0; i < ClientCount; i++ {
+		for j := i + 1; j < ClientCount; j++ {
 			latency := randomDur(10, 100)
 			packetLoss := rand.Float64() * 0.1
-			err := microservices[i].connect(microservices[j], latency, packetLoss)
+			err := Clients[i].connect(Clients[j], latency, packetLoss)
 			if err != nil {
-				fmt.Printf("%sError connecting Microservice %d and Microservice %d:%s %v\n", Red, i, j, Reset, err)
+				fmt.Printf("%sError connecting Client %d and Client %d:%s %v\n", Red, i, j, Reset, err)
 			}
 		}
 	}
@@ -145,26 +147,26 @@ func main() {
 	var netWg sync.WaitGroup
 	var sendWg sync.WaitGroup
 
-	for _, microservice := range microservices {
+	for _, Client := range Clients {
 		wg.Add(1)
-		go microservice.run(&wg)
+		go Client.run(&wg)
 	}
 
 	// Simulate sending messages
-	for i := 0; i < microserviceCount; i++ {
+	for i := 0; i < ClientCount; i++ {
 		sendWg.Add(1)
 		go func(sender int) {
 			defer sendWg.Done()
-			for requestId, neighbor := range microservices[sender].neighbors {
+			for requestId, neighbor := range Clients[sender].neighbors {
 
 				requestType := requestTypes[rand.Intn(len(requestTypes))]
 
-				microservices[sender].send(Message{
+				Clients[sender].send(Message{
 					requestId:   requestId,
 					requestType: requestType,
 					from:        sender,
 					to:          neighbor.id,
-					data:        fmt.Sprintf("Request from Microservice %d!", sender),
+					data:        fmt.Sprintf("Request from Client %d!", sender),
 					sendAt:      time.Now(),
 					latency:     randomDur(10, 100),
 				})
@@ -172,12 +174,12 @@ func main() {
 		}(i)
 	}
 
-	// Simulate the network passing messages between Microservices
-	for i := 0; i < microserviceCount; i++ {
+	// Simulate the network passing messages between Clients
+	for i := 0; i < ClientCount; i++ {
 		netWg.Add(1)
-		go func(MicroserviceIndex int) {
+		go func(ClientIndex int) {
 			defer netWg.Done()
-			for msg := range microservices[MicroserviceIndex].outbox {
+			for msg := range Clients[ClientIndex].outbox {
 				for _, conn := range network.connections {
 					if conn.from.id == msg.from && conn.to.id == msg.to {
 						// Simulate latency
@@ -185,11 +187,11 @@ func main() {
 
 						// Simulate packet loss
 						if rand.Float64() < conn.packetLoss {
-							fmt.Printf("%sPacket loss: Microservice %d -> Microservice %d%s\n", Red, msg.from, msg.to, Reset)
+							fmt.Printf("%sPacket loss: Client %d -> Client %d%s\n", Red, msg.from, msg.to, Reset)
 							continue
 						}
 
-						microservices[msg.to].inbox <- msg
+						Clients[msg.to].inbox <- msg
 					}
 				}
 			}
@@ -201,9 +203,9 @@ func main() {
 	runCLI()
 
 	// tie off the open channels
-	for i := 0; i < microserviceCount; i++ {
-		close(microservices[i].outbox)
-		close(microservices[i].inbox)
+	for i := 0; i < ClientCount; i++ {
+		close(Clients[i].outbox)
+		close(Clients[i].inbox)
 	}
 
 }
@@ -234,14 +236,14 @@ func runCLI() {
 		}
 
 		from, err := strconv.Atoi(parts[0])
-		if err != nil || from < 0 || from >= microserviceCount {
-			fmt.Printf("%sInvalid 'from' microservice ID, please try again.%s\n", Red, Reset)
+		if err != nil || from < 0 || from >= ClientCount {
+			fmt.Printf("%sInvalid 'from' Client ID, please try again.%s\n", Red, Reset)
 			continue
 		}
 
 		to, err := strconv.Atoi(parts[1])
-		if err != nil || to < 0 || to >= microserviceCount {
-			fmt.Printf("%sInvalid 'to' microservices ID, please try again.%s\n", Red, Reset)
+		if err != nil || to < 0 || to >= ClientCount {
+			fmt.Printf("%sInvalid 'to' Client ID, please try again.%s\n", Red, Reset)
 			continue
 		}
 
@@ -252,12 +254,12 @@ func runCLI() {
 		}
 
 		requestID := rand.Int()
-		microservices[from].send(Message{
+		Clients[from].send(Message{
 			requestId:   requestID,
 			requestType: requestType,
 			from:        from,
 			to:          to,
-			data:        fmt.Sprintf("%sRequest from microservices %d!%s", Magenta, from, Reset),
+			data:        fmt.Sprintf("%sRequest from Client %d!%s", Magenta, from, Reset),
 			sendAt:      time.Now(),
 			latency:     randomDur(10, 100),
 		})
