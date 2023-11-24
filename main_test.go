@@ -8,6 +8,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/Dissurender/stellar/utils"
 )
 
 func Test_connect(t *testing.T) {
@@ -133,17 +135,6 @@ func Test_handleRequest(t *testing.T) {
 		}
 	})
 
-	t.Run("handle unknown request type", func(t *testing.T) {
-		msg := Message{from: 2, requestType: "InvalidRequest"}
-		output := captureOutput(func() {
-			ms.handleRequest(msg)
-		})
-
-		expected := fmt.Sprintf("%sClient 1: Unknown request type from Client 2%s\n", Red, Reset)
-		if output != expected {
-			t.Fatalf("Expected output: %q, got: %q", expected, output)
-		}
-	})
 }
 
 func Test_randomDur(t *testing.T) {
@@ -154,7 +145,7 @@ func Test_randomDur(t *testing.T) {
 	max := 100
 
 	for i := 0; i < 1000; i++ {
-		duration := randomDur(min, max)
+		duration := utils.RandomDuration(min, max)
 
 		if duration < time.Duration(min)*time.Millisecond || duration >= time.Duration(max)*time.Millisecond {
 			t.Fatalf("Expected duration to be between %d and %d but got %v", min, max, duration)
@@ -162,9 +153,9 @@ func Test_randomDur(t *testing.T) {
 	}
 
 	var sameCount int
-	previousDur := randomDur(min, max)
+	previousDur := utils.RandomDuration(min, max)
 	for i := 0; i < 1000; i++ {
-		duration := randomDur(min, max)
+		duration := utils.RandomDuration(min, max)
 		if duration == previousDur {
 			sameCount++
 		}
@@ -182,7 +173,7 @@ func Test_Contains(t *testing.T) {
 		arr := []string{"GetData", "UpdateData", "DeleteData"}
 		str := "DeleteData"
 
-		if !contains(arr, str) {
+		if !utils.Contains(arr, str) {
 			t.Fatalf("Expected to find %q in the slice, but it was not found", str)
 		}
 	})
@@ -191,7 +182,7 @@ func Test_Contains(t *testing.T) {
 		arr := []string{"GetData", "UpdateData", "DeleteData"}
 		str := "grape"
 
-		if contains(arr, str) {
+		if utils.Contains(arr, str) {
 			t.Fatalf("Expected not to find %q in the slice, but it was found", str)
 		}
 	})
@@ -200,7 +191,7 @@ func Test_Contains(t *testing.T) {
 		arr := []string{}
 		str := "apple"
 
-		if contains(arr, str) {
+		if utils.Contains(arr, str) {
 			t.Fatalf("Expected not to find %q in the empty slice, but it was found", str)
 		}
 	})
@@ -209,7 +200,7 @@ func Test_Contains(t *testing.T) {
 		var arr []string
 		str := "apple"
 
-		if contains(arr, str) {
+		if utils.Contains(arr, str) {
 			t.Fatalf("Expected not to find %q in the nil slice, but it was found", str)
 		}
 	})

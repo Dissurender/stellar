@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/Dissurender/stellar/utils"
 )
 
 // ANSI codes for fmt
@@ -26,7 +28,6 @@ const (
 
 type Client struct {
 	id        int
-	cType     string
 	outbox    chan Message
 	inbox     chan Message
 	neighbors []*Client
@@ -92,25 +93,24 @@ func (c *Client) run(wg *sync.WaitGroup) {
 
 var requestTypes = []string{"GetData", "UpdateData", "DeleteData"}
 
+var colorCodes = map[string]string{
+	"GetData":    Blue,
+	"UpdateData": Yellow,
+	"DeleteData": Magenta,
+}
+
 func (c *Client) handleRequest(msg Message) {
-	switch msg.requestType {
-	case "GetData":
-		fmt.Printf("%sClient %d: Received GetData request from Client %d%s\n", Blue, c.id, msg.from, Reset)
-	case "UpdateData":
-		fmt.Printf("%sClient %d: Received UpdateData request from Client %d%s\n", Yellow, c.id, msg.from, Reset)
-	case "DeleteData":
-		fmt.Printf("%sClient %d: Received DeleteData request from Client %d%s\n", Magenta, c.id, msg.from, Reset)
-	default:
-		fmt.Printf("%sClient %d: Unknown request type from Client %d%s\n", Red, c.id, msg.from, Reset)
+	colorCode, ok := colorCodes[msg.requestType]
+	if !ok {
+		colorCode = Red
+		fmt.Fprintf(os.Stderr, "%sClient %d: Unknown request type from Client %d%s", colorCode, c.id, msg.from, Reset)
+		return
 	}
+	fmt.Printf("%sClient %d: Received %s request from Client %d%s\n", colorCode, c.id, msg.requestType, msg.from, Reset)
+
 }
 
-// helper func to determine latency for messages
-func randomDur(min, max int) time.Duration {
-	return time.Duration(rand.Intn(max-min)+min) * time.Millisecond
-}
-
-// initialize psuedo global values for use throughout the program
+// initialize values for use throughout the program
 var network Network
 
 var ClientCount = 10
@@ -123,21 +123,20 @@ func main() {
 	for i := 0; i < ClientCount; i++ {
 		Clients[i] = &Client{
 			id:        i,
-			cType:     "client",
 			outbox:    make(chan Message),
 			inbox:     make(chan Message),
 			neighbors: []*Client{},
 		}
 	}
 
-	// add a bit of attributes that would apply in real situation
+	// add a bit of situational attributes
 	for i := 0; i < ClientCount; i++ {
 		for j := i + 1; j < ClientCount; j++ {
-			latency := randomDur(10, 100)
+			latency := utils.RandomDuration(10, 100)
 			packetLoss := rand.Float64() * 0.1
 			err := Clients[i].connect(Clients[j], latency, packetLoss)
 			if err != nil {
-				fmt.Printf("%sError connecting Client %d and Client %d:%s %v\n", Red, i, j, Reset, err)
+				fmt.Fprintf(os.Stderr, "%sError connecting Client %d and Client %d:%s %v\n", Red, i, j, Reset, err)
 			}
 		}
 	}
@@ -168,7 +167,7 @@ func main() {
 					to:          neighbor.id,
 					data:        fmt.Sprintf("Request from Client %d!", sender),
 					sendAt:      time.Now(),
-					latency:     randomDur(10, 100),
+					latency:     utils.RandomDuration(10, 100),
 				})
 			}
 		}(i)
@@ -219,37 +218,37 @@ func runCLI() {
 
 		input, err := reader.ReadString('\n')
 		if err != nil {
-			fmt.Printf("%sError reading input: %s%s\n", Red, err, Reset)
+			fmt.Fprintf(os.Stderr, "%sError reading input: %s%s\n", Red, err, Reset)
 			continue
 		}
 
 		input = strings.TrimSpace(input)
 
 		if input == "exit" {
-			break
+			os.Exit(0)
 		}
 
 		parts := strings.Split(input, " ")
 		if len(parts) != 3 {
-			fmt.Printf("%sInvalid input format, please try again.%s\n", Red, Reset)
+			fmt.Fprintf(os.Stderr, "%sInvalid input format, please try again.%s\n", Red, Reset)
 			continue
 		}
 
 		from, err := strconv.Atoi(parts[0])
 		if err != nil || from < 0 || from >= ClientCount {
-			fmt.Printf("%sInvalid 'from' Client ID, please try again.%s\n", Red, Reset)
+			fmt.Fprintf(os.Stderr, "%sInvalid 'from' Client ID, please try again.%s\n", Red, Reset)
 			continue
 		}
 
 		to, err := strconv.Atoi(parts[1])
 		if err != nil || to < 0 || to >= ClientCount {
-			fmt.Printf("%sInvalid 'to' Client ID, please try again.%s\n", Red, Reset)
+			fmt.Fprintf(os.Stderr, "%sInvalid 'to' Client ID, please try again.%s\n", Red, Reset)
 			continue
 		}
 
 		requestType := parts[2]
-		if !contains(requestTypes, requestType) {
-			fmt.Printf("%sInvalid request type. Allowed types: %v%s\n", Red, requestTypes, Reset)
+		if !utils.Contains(requestTypes, requestType) {
+			fmt.Fprintf(os.Stderr, "%sInvalid request type. Allowed types: %v%s\n", Red, requestTypes, Reset)
 			continue
 		}
 
@@ -261,18 +260,7 @@ func runCLI() {
 			to:          to,
 			data:        fmt.Sprintf("%sRequest from Client %d!%s", Magenta, from, Reset),
 			sendAt:      time.Now(),
-			latency:     randomDur(10, 100),
+			latency:     utils.RandomDuration(10, 100),
 		})
 	}
-}
-
-// contains() is a helper function for runCLI()
-
-func contains(arr []string, str string) bool {
-	for _, v := range arr {
-		if v == str {
-			return true
-		}
-	}
-	return false
 }
