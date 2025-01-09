@@ -60,10 +60,10 @@ func (c *Client) connect(other *Client, latency time.Duration, packetLoss float6
 		return fmt.Errorf("%scannot connect to a nil Client%s", Red, Reset)
 	}
 	if latency < 0 {
-		return fmt.Errorf(fmt.Sprintf("%slatency must be non-negative%s", Red, Reset))
+		return fmt.Errorf("%s", fmt.Sprintf("%slatency must be non-negative%s", Red, Reset))
 	}
 	if packetLoss < 0 || packetLoss > 1 {
-		return fmt.Errorf(fmt.Sprintf("%spacket loss is out of bounds%s", Red, Reset))
+		return fmt.Errorf("%s", fmt.Sprintf("%spacket loss is out of bounds%s", Red, Reset))
 	}
 
 	c.neighbors = append(c.neighbors, other)
@@ -107,14 +107,15 @@ func (c *Client) handleRequest(msg Message) {
 		return
 	}
 	fmt.Printf("%sClient %d: Received %s request from Client %d%s\n", colorCode, c.id, msg.requestType, msg.from, Reset)
-
 }
 
 // initialize values for use throughout the program
 var network Network
 
-var ClientCount = 10
-var Clients = make([]*Client, ClientCount)
+var (
+	ClientCount = 10
+	Clients     = make([]*Client, ClientCount)
+)
 
 func main() {
 	// rand.Seed(seed)
@@ -206,7 +207,6 @@ func main() {
 		close(Clients[i].outbox)
 		close(Clients[i].inbox)
 	}
-
 }
 
 func runCLI() {
